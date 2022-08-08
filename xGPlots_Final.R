@@ -75,14 +75,13 @@ req_match <- wc18_events %>%
 #create separate data set for total team xG
 req_match_xg <- req_match %>% 
   group_by(team.name) %>% 
-  summarize(tot_xg = sum(shot.statsbomb_xg) %>% signif(digits = 2)) %>% 
+  summarize(tot_xg = sum(shot.statsbomb_xg) %>% signif(digits = 3)) %>% 
   mutate(team_label = glue::glue("{team.name}: {tot_xg} xG"))
 
 #GET MATCHLENGTH AND TEAM NAMES TO JOIN WITH CROSSING DATA
 minute <- c(0:max(req_match$minute))
 team.name <-  unique(req_match$team.name)
 
-#get accumulated xG
 #get accumulated xG
 req_match_rollsum <- req_match %>% 
   group_by(minute, team.name, period) %>% 
@@ -100,7 +99,8 @@ req_match_rollsum <- req_match %>%
   ))
 
 #Bring rollsum, goal and crossing data together
-req_match_rollsum_join <- req_match_rollsum %>%
+req_match_rollsum_join <- req_match_rollsum %>% 
+  full_join(crossing(minute, team.name), by = c("minute", "team.name")) %>% 
   #join with main data set to highlight goals
   left_join(req_match %>% filter(shot.outcome.name == "Goal" | type.name == "Own Goal For") %>% select(minute, shot.outcome.name, type.name, team.name, player.name),by = c("minute", "team.name")) %>% 
   #add labels and columns for goals scored
@@ -116,10 +116,14 @@ req_match_rollsum_join <- req_match_rollsum %>%
            TRUE ~ 0)) %>% 
   arrange(team.name, minute) %>% 
   select(1,2,8:11) %>% 
-  mutate(rollsum_goal = case_when(is.na(rollsum_goal) ~ lag(rollsum_goal),
-                                  TRUE ~ rollsum_goal)) %>% 
-  arrange(minute) %>% distinct()
-
+  mutate(rollsum_lead = as.numeric(lead(rollsum_goal)),
+         rollsum_lag = as.numeric(lag(rollsum_goal))) %>% 
+  mutate(rollsum_goal = case_when(is.na(rollsum_goal) & !is.na(rollsum_lag) ~ rollsum_lag,
+                                  is.na(rollsum_goal) & is.na(rollsum_lag) & is.na(lag(rollsum_lag)) ~ rollsum_lead,
+                                  is.na(rollsum_goal) & is.na(rollsum_lag) ~ lag(rollsum_lag),
+                                    TRUE ~ rollsum_goal)) %>% 
+  arrange(minute) %>% 
+  select(1:6)
 
 #create version for sonification -------
 xg_plot_export <- req_match_rollsum_join %>% 
@@ -207,7 +211,7 @@ req_match_rollsumxg_plot <- req_match_rollsum_join %>%
     4 - 2
     <span style='color:#ED1C24;'>Croatia</span>
     </span>",
-       subtitle = paste(wc18$competition.competition_name, sep = " ", paste("(",format(as.Date(max(wc18$match_date)),"%d/%m/%Y"),")", sep = "")),
+       subtitle = paste(wc18$competition.competition_name, wc18$competition_stage.name[wc18$match_date == max(wc18$match_date)], sep = " ", paste("(",format(as.Date(max(wc18$match_date)),"%d/%m/%Y"),")", sep = "")),
        x="mins", y="ExpG", caption = "Event data courtesy of StatsBomb")
 
 req_match_rollsumxg_plot

@@ -99,7 +99,8 @@ req_match_rollsum <- req_match %>%
   ))
 
 #Bring rollsum, goal and crossing data together
-req_match_rollsum_join <- req_match_rollsum %>% full_join(crossing(minute, team.name), by = c("minute", "team.name")) %>% 
+req_match_rollsum_join <- req_match_rollsum %>% 
+  full_join(crossing(minute, team.name), by = c("minute", "team.name")) %>% 
   #join with main data set to highlight goals
   left_join(req_match %>% filter(shot.outcome.name == "Goal" | type.name == "Own Goal For") %>% select(minute, shot.outcome.name, type.name, team.name, player.name),by = c("minute", "team.name")) %>% 
   #add labels and columns for goals scored
@@ -115,9 +116,14 @@ req_match_rollsum_join <- req_match_rollsum %>% full_join(crossing(minute, team.
            TRUE ~ 0)) %>% 
   arrange(team.name, minute) %>% 
   select(1,2,8:11) %>% 
-  mutate(rollsum_goal = case_when(is.na(rollsum_goal) ~ lag(rollsum_goal),
+  mutate(rollsum_lead = as.numeric(lead(rollsum_goal)),
+         rollsum_lag = as.numeric(lag(rollsum_goal))) %>% 
+  mutate(rollsum_goal = case_when(is.na(rollsum_goal) & !is.na(rollsum_lag) ~ rollsum_lag,
+                                  is.na(rollsum_goal) & is.na(rollsum_lag) & is.na(lag(rollsum_lag)) ~ rollsum_lead,
+                                  is.na(rollsum_goal) & is.na(rollsum_lag) ~ lag(rollsum_lag),
                                   TRUE ~ rollsum_goal)) %>% 
-  arrange(minute) %>% distinct()
+  arrange(minute) %>% 
+  select(1:6)
 
 
 #create version for sonification -------
@@ -147,14 +153,6 @@ xg_plot_export <- xg_plot_export %>%
          Brazil_xG = as.numeric(Brazil_xG),
          Belgium_Goal = as.numeric(Belgium_Goal),
          Brazil_Goal = as.numeric(Brazil_Goal))
-
-
-  #Scale to 0-5v range based on max values
-xg_plot_export <- xg_plot_export %>% 
-  mutate(Belgium_xG_scaled = 5*(Belgium_xG /(max(Belgium_xG,Brazil_xG))),
-         Brazil_xG_scaled = 5*(Brazil_xG /(max(Belgium_xG,Brazil_xG))))
-
-
 
 write_csv(xg_plot_export, "/Users/SikSik/Documents/Data Science/Datasets/xGPlot_BrazilvBelgium.csv")
 
@@ -214,7 +212,7 @@ req_match_rollsumxg_plot <- req_match_rollsum_join %>%
     1 - 2
     <span style='color:#C8102E;'>Belgium</span>
     </span>",
-       subtitle = paste(wc18$competition.competition_name, sep = " ", paste("(",format(as.Date(wc18$match_date[wc18$match_id == 8650]),"%d/%m/%Y"),")", sep = "")),
+       subtitle = paste(wc18$competition.competition_name, wc18$competition_stage.name[wc18$match_id == 8650], sep = " ", paste("(",format(as.Date(wc18$match_date[wc18$match_id == 8650]),"%d/%m/%Y"),")", sep = "")),
        x="mins", y="ExpG", caption = "Event data courtesy of StatsBomb")
 
 req_match_rollsumxg_plot
@@ -250,3 +248,4 @@ statsbomb_logo
 magick::image_write(
   image = statsbomb_logo, 
   path = here::here("outputs/Brazil_vs_Belgium_xGPlot_FINAL.png"))
+s
