@@ -121,7 +121,7 @@ req_match_rollsum_join <- req_match_rollsum %>% full_join(crossing(minute, team.
 
 
 #create version for sonification -------
-xg_plot_export <- req_match_rollsum %>% 
+xg_plot_export <- req_match_rollsum_join %>% 
   select(team.name, minute, rollsum_goal, goal_flag) %>% 
   pivot_wider(names_from = team.name, values_from = c(rollsum_goal, goal_flag))
 
@@ -209,14 +209,44 @@ req_match_rollsumxg_plot <- req_match_rollsum_join %>%
         panel.grid.minor = element_blank(),
         panel.background = element_rect(colour = bgcol, fill = bgcol),
         plot.background = element_rect(colour = bgcol, fill = bgcol),
-        plot.caption = element_text(colour = textcol, size = 12)) +
+        plot.caption = element_blank()) +
   labs(title = "<span style='color:#FEDD00;'>Brazil</span>
     1 - 2
     <span style='color:#C8102E;'>Belgium</span>
     </span>",
-       subtitle = paste(wc18$competition.competition_name, "(", format(as.Date(wc18$match_date[wc18$match_id == 8650]),"%d/%m/%Y"),")"),
+       subtitle = paste(wc18$competition.competition_name, sep = " ", paste("(",format(as.Date(wc18$match_date[wc18$match_id == 8650]),"%d/%m/%Y"),")", sep = "")),
        x="mins", y="ExpG", caption = "Event data courtesy of StatsBomb")
 
 req_match_rollsumxg_plot
 
+#EXPORT PLOTS -----
+ggsave(plot = req_match_rollsumxg_plot,
+       filename = here("outputs/Brazil_vs_Belgium_xGPlot.png"),
+       height = 8, width = 14)
 
+#add W22 logo
+plot_watch22_logo <- add_logo(
+  plot_path = here("outputs/Brazil_vs_Belgium_xGPlot.png"),
+  logo_path = ("/Users/SikSik/Pictures/Watch22/WATCH22_CIRCLE.png"),
+  logo_position = "top right",
+  logo_scale = 17)
+
+plot_watch22_logo
+
+magick::image_write(
+  image = plot_watch22_logo, 
+  path = here::here("outputs/Brazil_vs_Belgium_xGPlot_W22.png"))
+
+#add StatsBomb logo
+
+statsbomb_logo <- add_logo(
+  plot_path = here::here("outputs/Brazil_vs_Belgium_xGPlot_W22.png"),
+  logo_path = ("/Users/SikSik/Documents/Data Science/StatsBomb/resources/SB - Icon Lockup - Colour positive.png"),
+  logo_position = "bottom right",
+  logo_scale = 8)
+
+statsbomb_logo
+
+magick::image_write(
+  image = statsbomb_logo, 
+  path = here::here("outputs/Brazil_vs_Belgium_xGPlot_FINAL.png"))
